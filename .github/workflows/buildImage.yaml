@@ -24,7 +24,7 @@ jobs:
         include:
           - runs-on: ubuntu-latest
             architecture: arm64
-            scheme-full: false
+            scheme-full: true
     runs-on: ${{ matrix.runs-on }}
 
     steps:
