@@ -62,6 +62,8 @@ jobs:
           file: server-ce/Dockerfile-base
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:latest
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:buildcache
+          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:buildcache,mode=max 
       -
         name: Build and push image
         if: ${{ inputs.buildImage }}
@@ -74,3 +76,5 @@ jobs:
           build-args: SHARELATEX_BASE_TAG=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:latest
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:latest
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:buildcache
+          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:buildcache,mode=max
