@@ -33,7 +33,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: "overleaf/overleaf"
-          ref: "main"
+          ref: "710cacad2dc8921e1fcfd306c54843266226be89"
           path: "${{ github.workspace }}"        
       -
         name: Set up QEMU
