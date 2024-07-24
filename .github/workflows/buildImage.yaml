@@ -73,7 +73,7 @@ jobs:
           context: ${{ github.workspace }}
           #directory: server-ce
           file: server-ce/Dockerfile
-          build-args: SHARELATEX_BASE_TAG=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:latest
+          build-args: SHARELATEX_BASE_TAG=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:latest
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:buildcache
