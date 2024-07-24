@@ -24,7 +24,6 @@ jobs:
         include:
           - runs-on: ubuntu-latest
             architecture: arm64
-            scheme-full: false
     runs-on: ${{ matrix.runs-on }}
 
     steps:
@@ -48,11 +47,6 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       -
-        name: Change scheme
-        working-directory: ${{ github.workspace }}
-        if: inputs.buildBaseImage && matrix.scheme-full
-        run: sed -Ei 's/scheme-basic/scheme-full/' server-ce/Dockerfile-base
-      -
         name: Build and push base image
         if: ${{ inputs.buildBaseImage }}
         uses: docker/build-push-action@v4
@@ -61,9 +55,7 @@ jobs:
           context: ${{ github.workspace }}
           file: server-ce/Dockerfile-base
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:latest
-          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:buildcache
-          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:buildcache,mode=max 
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:latest 
       -
         name: Build and push image
         if: ${{ inputs.buildImage }}
@@ -71,10 +63,7 @@ jobs:
         with:
           platforms: linux/${{ matrix.architecture }}
           context: ${{ github.workspace }}
-          #directory: server-ce
           file: server-ce/Dockerfile
           build-args: SHARELATEX_BASE_TAG=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:latest
-          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:buildcache
-          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:buildcache,mode=max
