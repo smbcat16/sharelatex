@@ -24,6 +24,7 @@ jobs:
         include:
           - runs-on: ubuntu-latest
             architecture: arm64
+            scheme-full: false
     runs-on: ${{ matrix.runs-on }}
 
     steps:
@@ -36,16 +37,22 @@ jobs:
           path: "${{ github.workspace }}"        
       -
         name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
       -
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
       -
         name: Login to Docker Hub
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+      -
+        name: Change scheme
+        if: inputs.buildBaseImage && matrix.scheme-full
+        working-directory: ${{ github.workspace }}
+        run: sed -Ei 's/scheme-basic/scheme-full/' server-ce/Dockerfile-base
+          
       -
         name: Build and push base image
         if: ${{ inputs.buildBaseImage }}
