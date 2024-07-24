@@ -50,7 +50,7 @@ jobs:
       -
         name: Change scheme
         working-directory: ${{ github.workspace }}
-        if: inputs.buildBaseImage and matrix.scheme-full
+        if: inputs.buildBaseImage && matrix.scheme-full
         run: sed -Ei 's/scheme-basic/scheme-full/' server-ce/Dockerfile-base
       -
         name: Build and push base image
