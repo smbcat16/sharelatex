@@ -38,8 +38,7 @@ jobs:
       matrix:
         versions: ${{fromJson(needs.prep-env.outputs.versions)}}      
         include:
-          - architecture: arm64
-            scheme-full: false
+          - scheme-full: false
     runs-on: ubuntu-latest
 
     steps:
@@ -73,26 +72,40 @@ jobs:
         if: ${{ inputs.buildBaseImage }}
         uses: docker/build-push-action@v4
         with:
-          platforms: linux/${{ matrix.architecture }}
+          platforms: |
+            linux/amd64
+            linux/arm64
           context: ${{ github.workspace }}
           file: server-ce/Dockerfile-base
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:${{matrix.versions.tag}}
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:${{matrix.versions.tag}}
       -
-        name: Change OVERLEAF_BASE_TAG
+        name: Build and push image amd64
+        if: ${{ inputs.buildImage }}
+        uses: docker/build-push-action@v4
+        with:
+          platforms: linux/amd64
+          context: ${{ github.workspace }}
+          file: server-ce/Dockerfile
+          build-args: SHARELATEX_BASE_TAG=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:${{matrix.versions.tag}}
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:${{matrix.versions.tag}}
+      -
+        name: Change OVERLEAF_BASE_TAG arm64
         if: ${{ inputs.buildImage }}
         working-directory: ${{ github.workspace }}
         run: sed -Ei 's|sharelatex/sharelatex-base:latest|\"${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:${{matrix.versions.tag}}\"|' server-ce/Dockerfile
       -
-        name: Build and push image
+        name: Build and push image arm64
         if: ${{ inputs.buildImage }}
         uses: docker/build-push-action@v4
         with:
-          platforms: linux/${{ matrix.architecture }}
+          platforms: linux/arm64
           context: ${{ github.workspace }}
           file: server-ce/Dockerfile
-          build-args: SHARELATEX_BASE_TAG=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:${{matrix.versions.tag}}
+          build-args: SHARELATEX_BASE_TAG=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:${{matrix.versions.tag}}
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:${{matrix.versions.tag}}
