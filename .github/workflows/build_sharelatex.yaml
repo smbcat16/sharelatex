@@ -21,7 +21,7 @@ on:
 
 jobs:
   prep-env:
-    runs-on: ubuntu-latest
+    runs-on: arm64
     steps:
       - uses: actions/checkout@v4
 
@@ -39,7 +39,7 @@ jobs:
         versions: ${{fromJson(needs.prep-env.outputs.versions)}}      
         include:
           - scheme-full: false
-    runs-on: ubuntu-latest
+    runs-on: arm64
 
     steps:
       -
