@@ -40,11 +40,11 @@ jobs:
     needs: prep-env 
     strategy:
       matrix:
-        versions: ${{fromJson(needs.prepare-environment.outputs.versions)}}      
+        versions: ${{fromJson(needs.prep-env.outputs.versions)}}      
         include:
           - architecture: arm64
             scheme-full: false
-    runs-on: ${{ prep-env.runs-on }}
+    runs-on: ${{ needs.prep-env.runs-on }}
 
     steps:
       -
