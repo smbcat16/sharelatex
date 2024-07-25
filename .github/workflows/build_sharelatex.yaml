@@ -44,7 +44,7 @@ jobs:
         include:
           - architecture: arm64
             scheme-full: false
-    runs-on: ${{ prep-env.matrix.runs-on }}
+    runs-on: ${{ prep-env.runs-on }}
 
     steps:
       -
