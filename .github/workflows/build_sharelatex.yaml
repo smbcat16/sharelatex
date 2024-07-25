@@ -21,11 +21,7 @@ on:
 
 jobs:
   prep-env:
-    strategy:
-      matrix:
-        include:
-          - runs-on: ubuntu-latest
-    runs-on: ${{matrix.runs-on}}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
