@@ -72,26 +72,12 @@ jobs:
         if: ${{ inputs.buildBaseImage }}
         uses: docker/build-push-action@v4
         with:
-          platforms: |
-            linux/amd64
-            linux/arm64
+          platforms: linux/arm64
           context: ${{ github.workspace }}
           file: server-ce/Dockerfile-base
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:${{matrix.versions.tag}}
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:${{matrix.versions.tag}}
-      -
-        name: Build and push image amd64
-        if: ${{ inputs.buildImage }}
-        uses: docker/build-push-action@v4
-        with:
-          platforms: linux/amd64
-          context: ${{ github.workspace }}
-          file: server-ce/Dockerfile
-          build-args: SHARELATEX_BASE_TAG=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:${{matrix.versions.tag}}
-          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:${{matrix.versions.tag}}
       -
         name: Change OVERLEAF_BASE_TAG arm64
         if: ${{ inputs.buildImage }}
