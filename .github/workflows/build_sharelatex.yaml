@@ -39,7 +39,7 @@ jobs:
         versions: ${{fromJson(needs.prep-env.outputs.versions)}}      
         include:
           - architecture: arm64
-            scheme-full: false
+            scheme-full: true
     runs-on: ubuntu-latest
 
     steps:
