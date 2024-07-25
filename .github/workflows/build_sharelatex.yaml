@@ -42,7 +42,7 @@ jobs:
       matrix:
         versions: ${{fromJson(needs.prepare-environment.outputs.versions)}}      
         include:
-            architecture: arm64
+          - architecture: arm64
             scheme-full: false
     runs-on: ${{ prep-env.matrix.runs-on }}
 
