@@ -21,7 +21,7 @@ on:
 
 jobs:
   prep-env:
-    runs-on: arm64
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -39,7 +39,7 @@ jobs:
         versions: ${{fromJson(needs.prep-env.outputs.versions)}}      
         include:
           - scheme-full: false
-    runs-on: arm64
+    runs-on: ubuntu-latest
 
     steps:
       -
@@ -72,14 +72,14 @@ jobs:
         if: ${{ inputs.buildBaseImage }}
         uses: docker/build-push-action@v4
         with:
-          platforms: linux/arm64
+          platforms: linux/amd64, linux/arm64
           context: ${{ github.workspace }}
           file: server-ce/Dockerfile-base
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:${{matrix.versions.tag}}
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:${{matrix.versions.tag}}
       -
-        name: Change OVERLEAF_BASE_TAG arm64
+        name: Change OVERLEAF_BASE_TAG
         if: ${{ inputs.buildImage }}
         working-directory: ${{ github.workspace }}
         run: sed -Ei 's|sharelatex/sharelatex-base:latest|\"${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:${{matrix.versions.tag}}\"|' server-ce/Dockerfile
@@ -88,7 +88,7 @@ jobs:
         if: ${{ inputs.buildImage }}
         uses: docker/build-push-action@v4
         with:
-          platforms: linux/arm64
+          platforms: linux/amd64, linux/arm64
           context: ${{ github.workspace }}
           file: server-ce/Dockerfile
           build-args: SHARELATEX_BASE_TAG=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base
