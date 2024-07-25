@@ -22,7 +22,7 @@ on:
 env:
   runs-on: ubuntu-latest
   architecture: arm64
-  platforms: linux/${{ env.architecture }}
+  platforms: linux/arm64
 
 jobs:
   prep-env:
