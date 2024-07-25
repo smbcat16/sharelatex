@@ -26,7 +26,7 @@ env:
 
 jobs:
   prep-env:
-    runs-on: env.RUNS-ON
+    runs-on: ${{ env.RUNS-ON }}
     steps:
       - uses: actions/checkout@v4
 
