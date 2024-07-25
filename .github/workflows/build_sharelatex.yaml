@@ -86,7 +86,7 @@ jobs:
         name: Change OVERLEAF_BASE_TAG
         if: ${{ inputs.buildImage }}
         working-directory: ${{ github.workspace }}
-        run: sed -Ei 's|"sharelatex/sharelatex-base:latest"|"${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:${{matrix.versions.tag}}"|' server-ce/Dockerfile
+        run: sed -Ei 's|sharelatex/sharelatex-base:latest|\"${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:${{matrix.versions.tag}}\"|' server-ce/Dockerfile
       -
         name: Build and push image
         if: ${{ inputs.buildImage }}
