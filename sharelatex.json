@@ -5,10 +5,6 @@
     {
       "tag": "latest",
       "sha": "main"
-    },
-    {
-      "tag": "5.0.7",
-      "sha": "cf227e2d085a859d360c51a4dfce13701fa6d41e"
     }
   ]
 }
