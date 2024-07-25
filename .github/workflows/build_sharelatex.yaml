@@ -2,6 +2,9 @@ name: Docker baseImage github CI
 
 on:
   push:
+    branches: [main]
+    paths:
+      - 'sharelatex.json'  
   repository_dispatch:
   workflow_dispatch:
     inputs:
@@ -17,15 +20,31 @@ on:
         type: boolean
 
 jobs:
-
-  build:
+  prep-env:
     strategy:
       matrix:
         include:
           - runs-on: ubuntu-latest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: prepare
+        uses: ActionsTools/read-json-action@main
+        with:
+          file_path: 'sharelatex.json'
+    outputs:
+      versions: ${{steps.prepare.outputs.versions}}
+
+  build:
+    needs: prep-env 
+    strategy:
+      matrix:
+        versions: ${{fromJson(needs.prepare-environment.outputs.versions)}}      
+        include:
             architecture: arm64
             scheme-full: false
-    runs-on: ${{ matrix.runs-on }}
+    runs-on: ${{ prep-env.matrix.runs-on }}
 
     steps:
       -
@@ -33,7 +52,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: "overleaf/overleaf"
-          ref: "710cacad2dc8921e1fcfd306c54843266226be89"
+          ref: ${{ matrix.versions.sha }}
           path: "${{ github.workspace }}"        
       -
         name: Set up QEMU
@@ -66,12 +85,12 @@ jobs:
           context: ${{ github.workspace }}
           file: server-ce/Dockerfile-base
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:latest
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:${{matrix.versions.tag}}
       -
         name: Change OVERLEAF_BASE_TAG
         if: ${{ inputs.buildImage }}
         working-directory: ${{ github.workspace }}
-        run: sed -Ei 's/OVERLEAF_BASE_TAG=sharelatex/sharelatex-base:latest/OVERLEAF_BASE_TAG=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:latest/' server-ce/Dockerfile
+        run: sed -Ei 's/OVERLEAF_BASE_TAG=sharelatex/sharelatex-base:latest/OVERLEAF_BASE_TAG=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:${{matrix.versions.tag}}/' server-ce/Dockerfile
       -
         name: Build and push image
         if: ${{ inputs.buildImage }}
@@ -80,6 +99,6 @@ jobs:
           platforms: linux/${{ matrix.architecture }}
           context: ${{ github.workspace }}
           file: server-ce/Dockerfile
-          build-args: SHARELATEX_BASE_TAG=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base
+          build-args: SHARELATEX_BASE_TAG=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:${{matrix.versions.tag}}
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:latest
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:${{matrix.versions.tag}}
