@@ -5,7 +5,9 @@ on:
     branches: [main]
     paths:
       - 'sharelatex.json'  
-
+  repository_dispatch:
+  workflow_dispatch:
+  
 jobs:
   prep-env:
     runs-on: ubuntu-latest
