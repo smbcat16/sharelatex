@@ -86,7 +86,7 @@ jobs:
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:${{matrix.versions.tag}}
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:${{matrix.versions.tag}}
       -
-        name: Change OVERLEAF_BASE_TAG and proxy
+        name: Change OVERLEAF_BASE_TAG
         if: ${{ inputs.buildImage }}
         working-directory: ${{ github.workspace }}
         run: |
