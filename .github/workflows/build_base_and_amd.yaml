@@ -1,10 +1,7 @@
 name: Docker baseImage and image amd github CI
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'sharelatex.json'  
+  push: 
   repository_dispatch:
   workflow_dispatch:
     inputs:
