@@ -70,6 +70,7 @@ jobs:
           file: server-ce/Dockerfile
           build-args: |
             SHARELATEX_BASE_TAG=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base
+            MONOREPO_REVISION=${{ steps.prepare-env.outputs.sha }}
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:${{matrix.versions.tag}}
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:${{matrix.versions.tag}}
