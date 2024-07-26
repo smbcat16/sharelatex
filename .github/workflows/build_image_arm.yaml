@@ -1,4 +1,4 @@
-name: Docker iamge arm github CI
+name: Docker image arm github CI
 
 on:
   push:
