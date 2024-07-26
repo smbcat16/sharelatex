@@ -38,7 +38,7 @@ jobs:
       matrix:
         versions: ${{fromJson(needs.prep-env.outputs.versions)}}      
         include:
-          - scheme-full: false
+          - scheme-full: true
     runs-on: ARM64
 
     steps:
