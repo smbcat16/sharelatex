@@ -20,23 +20,9 @@ on:
         type: boolean
 
 jobs:
-  prep-env:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - id: prepare
-        uses: ActionsTools/read-json-action@main
-        with:
-          file_path: 'sharelatex.json'
-    outputs:
-      versions: ${{steps.prepare.outputs.versions}}
-
   build:
-    needs: prep-env 
     strategy:
-      matrix:
-        versions: ${{fromJson(needs.prep-env.outputs.versions)}}      
+      matrix:  
         include:
           - scheme-full: true
     runs-on: ubuntu-latest
@@ -54,7 +40,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: "overleaf/overleaf"
-          ref: ${{ matrix.versions.sha }}
+          ref: "main"
           path: "${{ github.workspace }}"        
       -
         name: Set up QEMU
@@ -83,14 +69,15 @@ jobs:
           context: ${{ github.workspace }}
           file: server-ce/Dockerfile-base
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:${{matrix.versions.tag}}
-          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:${{matrix.versions.tag}}
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:latest
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:latest
+          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:latest,mode=max
       -
         name: Change OVERLEAF_BASE_TAG
         if: ${{ inputs.buildImage }}
         working-directory: ${{ github.workspace }}
         run: |
-          sed -Ei 's|sharelatex/sharelatex-base:latest|\"${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:${{matrix.versions.tag}}\"|' server-ce/Dockerfile
+          sed -Ei 's|sharelatex/sharelatex-base:latest|\"${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:latest\"|' server-ce/Dockerfile
       -
         name: Build and push image amd64
         if: ${{ inputs.buildImage }}
@@ -100,8 +87,8 @@ jobs:
           context: ${{ github.workspace }}
           file: server-ce/Dockerfile
           build-args: |
-            SHARELATEX_BASE_TAG=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base
-            MONOREPO_REVISION=${{ steps.prepare-env.outputs.sha }}            
+            SHARELATEX_BASE_TAG=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base         
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:${{matrix.versions.tag}}-amd
-          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:${{matrix.versions.tag}}-amd
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:latest-amd
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:latest-amd
+          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:latest-amd,mode=max
