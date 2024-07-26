@@ -84,7 +84,7 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           sed -Ei 's|sharelatex/sharelatex-base:latest|\"${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:${{matrix.versions.tag}}\"|' server-ce/Dockerfile
-          sed -Ei 's|npm install|npm install --maxsockets=5|' server-ce/Dockerfile
+          sed -Ei 's|npm install|npm install --maxsockets=5|' server-ce/genScript.js
       -
         name: Build and push image arm64
         if: ${{ inputs.buildImage }}
