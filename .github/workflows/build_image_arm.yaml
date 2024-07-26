@@ -65,7 +65,7 @@ jobs:
         name: Build and push image arm64
         uses: docker/build-push-action@v3
         with:
-          platforms: linux/amd64, linux/arm64
+          platforms: linux/arm64
           context: ${{ github.workspace }}
           file: server-ce/Dockerfile
           build-args: |
