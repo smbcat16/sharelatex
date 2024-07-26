@@ -26,7 +26,7 @@ jobs:
     strategy:
       matrix:
         versions: ${{fromJson(needs.prep-env.outputs.versions)}}      
-    runs-on: ARM64
+    runs-on: self-hosted
 
     steps:
       - 
