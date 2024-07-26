@@ -1,4 +1,4 @@
-name: Docker baseImage github CI
+name: Docker baseImage and image amd github CI
 
 on:
   push:
