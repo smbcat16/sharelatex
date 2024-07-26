@@ -84,8 +84,6 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           sed -Ei 's|sharelatex/sharelatex-base:latest|\"${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:${{matrix.versions.tag}}\"|' server-ce/Dockerfile
-          npm cache clean -f
-          npm ci  --noproxy registry.npmjs.org --maxsockets 5
       -
         name: Build and push image arm64
         if: ${{ inputs.buildImage }}
@@ -94,7 +92,10 @@ jobs:
           platforms: linux/amd64, linux/arm64
           context: ${{ github.workspace }}
           file: server-ce/Dockerfile
-          build-args: SHARELATEX_BASE_TAG=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base
+          build-args: |
+            SHARELATEX_BASE_TAG=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base
+            HTTP_PROXY=""
+            HTTPS_PROXY=""
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:${{matrix.versions.tag}}
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:${{matrix.versions.tag}}
