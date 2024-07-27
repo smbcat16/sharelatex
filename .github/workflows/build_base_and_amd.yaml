@@ -4,17 +4,6 @@ on:
   push: 
   repository_dispatch:
   workflow_dispatch:
-    inputs:
-      buildBaseImage:
-        description: 'Build base image'
-        required: false
-        default: true
-        type: boolean
-      buildImage:
-        description: 'Build image amd'
-        required: false
-        default: true
-        type: boolean
 
 jobs:
   build:
@@ -69,23 +58,3 @@ jobs:
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:latest
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:cache-latest
           cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:cache-latest,mode=max
-      -
-        name: Change OVERLEAF_BASE_TAG
-        if: ${{ inputs.buildImage }}
-        working-directory: ${{ github.workspace }}
-        run: |
-          sed -Ei 's|sharelatex/sharelatex-base:latest|\"${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:latest\"|' server-ce/Dockerfile
-      -
-        name: Build and push image amd64
-        if: ${{ inputs.buildImage }}
-        uses: docker/build-push-action@v3
-        with:
-          platforms: linux/amd64
-          context: ${{ github.workspace }}
-          file: server-ce/Dockerfile
-          build-args: |
-            SHARELATEX_BASE_TAG=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base         
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:latest-amd
-          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:cache-latest-amd
-          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:cache-latest-amd,mode=max
