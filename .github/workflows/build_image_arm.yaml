@@ -52,5 +52,5 @@ jobs:
             SHARELATEX_BASE_TAG=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:latest
-          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:latest
-          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:latest,mode=max
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:cache-latest
+          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:cache-latest,mode=max
