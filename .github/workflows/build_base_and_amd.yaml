@@ -1,4 +1,4 @@
-name: Docker baseImage and image amd github CI
+name: Docker sharelatex-base github CI
 
 on:
   push: 
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-base:
     strategy:
       matrix:  
         include:
@@ -42,13 +42,12 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       -
         name: Change scheme
-        if: inputs.buildBaseImage && matrix.scheme-full
+        if: matrix.scheme-full
         working-directory: ${{ github.workspace }}
         run: sed -Ei 's/scheme-basic/scheme-full/' server-ce/Dockerfile-base
           
       -
         name: Build and push base image
-        if: ${{ inputs.buildBaseImage }}
         uses: docker/build-push-action@v3
         with:
           platforms: linux/amd64, linux/arm64
@@ -56,5 +55,5 @@ jobs:
           file: server-ce/Dockerfile-base
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:latest
-          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:cache-latest
-          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:cache-latest,mode=max
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:cache
+          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:cache,mode=max
