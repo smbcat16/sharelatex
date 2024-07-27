@@ -62,7 +62,7 @@ jobs:
           build-args: |
             SHARELATEX_BASE_TAG=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:latest-amd
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:latest-amd64
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:cache-amd
           cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:cache-amd,mode=max
   build-arm64:
@@ -111,6 +111,6 @@ jobs:
           build-args: |
             SHARELATEX_BASE_TAG=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:latest
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:latest-arm64
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:cache-arm
           cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:cache-arm,mode=max
