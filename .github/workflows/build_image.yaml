@@ -1,4 +1,4 @@
-name: Docker image arm github CI
+name: Docker sharelatex-image github CI
 
 on:
   push: 
