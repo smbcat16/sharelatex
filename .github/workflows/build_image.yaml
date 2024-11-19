@@ -7,13 +7,13 @@ on:
     inputs:
       buildImageAMD64:
         description: 'Build image AMD64'
-        required: false
-        default: true
+        required: true
+        default: false
         type: boolean
       buildImageARM64:
         description: 'Build image ARM64'
-        required: false
-        default: true
+        required: true
+        default: false
         type: boolean  
 jobs:
   build-amd64:
