@@ -17,7 +17,7 @@ on:
         type: boolean  
 jobs:
   build-amd64:
-    if: ${{ inputs.buildImageARM64 }} 
+    if: ${{ inputs.buildImageAMD64 }} 
     runs-on: ubuntu-latest
     steps:
       - 
@@ -66,7 +66,7 @@ jobs:
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:cache-amd
           cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:cache-amd,mode=max
   build-arm64:
-    if: ${{ inputs.buildImageAMD64 }}
+    if: ${{ inputs.buildImageARM64 }}
     runs-on: self-hosted
     steps:
       - 
