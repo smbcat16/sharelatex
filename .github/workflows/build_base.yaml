@@ -11,7 +11,7 @@ jobs:
       matrix:  
         include:
           - scheme-full: true
-    runs-on: ubuntu-latest
+    runs-on: arm64
 
     steps:
       - 
