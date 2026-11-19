@@ -1,10 +1,36 @@
 name: Docker sharelatex-image github CI
 
 on:
-  push: 
-  repository_dispatch:
+  workflow_call:
+    inputs:
+      overleaf_ref:
+        description: 'Tag hoặc commit SHA của overleaf/overleaf'
+        required: true
+        type: string
+      image_version:
+        description: 'Số phiên bản để gắn tag Docker (ví dụ: 5.5.1)'
+        required: true
+        type: string
+      buildImageAMD64:
+        required: false
+        default: false
+        type: boolean
+      buildImageARM64:
+        required: false
+        default: true
+        type: boolean
   workflow_dispatch:
     inputs:
+      overleaf_ref:
+        description: 'Tag hoặc commit SHA của overleaf/overleaf (mặc định: main)'
+        required: false
+        default: 'main'
+        type: string
+      image_version:
+        description: 'Nhãn phiên bản phụ (để trống nếu chỉ đẩy latest)'
+        required: false
+        default: ''
+        type: string
       buildImageAMD64:
         description: 'Build image AMD64'
         required: true
@@ -13,104 +39,112 @@ on:
       buildImageARM64:
         description: 'Build image ARM64'
         required: true
-        default: false
-        type: boolean  
+        default: true
+        type: boolean
+
 jobs:
   build-amd64:
-    if: ${{ inputs.buildImageAMD64 }} 
+    if: ${{ inputs.buildImageAMD64 == true }}
     runs-on: ubuntu-latest
     steps:
-      - 
-        name: 'Cleanup build folder'
-        run: |
-          ls -la ./
-          rm -rf ./* || true
-          rm -rf ./.??* || true
-          ls -la ./    
-      -
-        name: Checkout Overleaf
+      - name: Cleanup build folder
+        run: rm -rf ./* ./.??* || true
+
+      - name: Checkout Overleaf
         uses: actions/checkout@v4
         with:
-          repository: "overleaf/overleaf"
-          ref: ${{ matrix.versions.sha }}
-          path: "${{ github.workspace }}"        
-      -
-        name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-      -
-        name: Set up Docker Buildx
+          repository: overleaf/overleaf
+          ref: ${{ inputs.overleaf_ref || 'main' }}
+          path: ${{ github.workspace }}
+
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      -
-        name: Login to Docker Hub
+
+      - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-          
-      -
-        name: Change OVERLEAF_BASE_TAG
+
+      - name: Point Dockerfile to custom base image
         working-directory: ${{ github.workspace }}
         run: |
-          sed -Ei 's|sharelatex/sharelatex-base:latest|\"${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:latest\"|' server-ce/Dockerfile
-      -
-        name: Build and push image amd64
-        uses: docker/build-push-action@v3
+          sed -Ei "s|sharelatex/sharelatex-base:latest|${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:latest|g" server-ce/Dockerfile
+
+      - name: Prepare tags
+        id: tags
+        run: |
+          TAGS="${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:latest-amd64"
+          if [ -n "${{ inputs.image_version }}" ]; then
+            TAGS="${TAGS},${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:${{ inputs.image_version }}-amd64"
+          fi
+          echo "list=${TAGS}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push image amd64
+        uses: docker/build-push-action@v6
         with:
           platforms: linux/amd64
           context: ${{ github.workspace }}
           file: server-ce/Dockerfile
           build-args: |
+            OVERLEAF_BASE_TAG=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:latest
             SHARELATEX_BASE_TAG=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:latest-amd64
+          tags: ${{ steps.tags.outputs.list }}
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:cache-amd
-          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:cache-amd,mode=max
+          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:cache-amd,mode=min
+
   build-arm64:
-    if: ${{ inputs.buildImageARM64 }}
+    if: ${{ inputs.buildImageARM64 == true }}
     runs-on: self-hosted
     steps:
-      - 
-        name: 'Cleanup build folder'
-        run: |
-          ls -la ./
-          rm -rf ./* || true
-          rm -rf ./.??* || true
-          ls -la ./    
-      -
-        name: Checkout Overleaf
+      - name: Cleanup build folder
+        run: rm -rf ./* ./.??* || true
+
+      - name: Checkout Overleaf
         uses: actions/checkout@v4
         with:
-          repository: "overleaf/overleaf"
-          ref: ${{ matrix.versions.sha }}
-          path: "${{ github.workspace }}"        
-      -
-        name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-      -
-        name: Set up Docker Buildx
+          repository: overleaf/overleaf
+          ref: ${{ inputs.overleaf_ref || 'main' }}
+          path: ${{ github.workspace }}
+
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      -
-        name: Login to Docker Hub
+
+      - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-          
-      -
-        name: Change OVERLEAF_BASE_TAG
+
+      - name: Point Dockerfile to custom base image
         working-directory: ${{ github.workspace }}
         run: |
-          sed -Ei 's|sharelatex/sharelatex-base:latest|\"${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:latest\"|' server-ce/Dockerfile
-      -
-        name: Build and push image arm64
-        uses: docker/build-push-action@v3
+          sed -Ei "s|sharelatex/sharelatex-base:latest|${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:latest|g" server-ce/Dockerfile
+
+      - name: Prepare tags
+        id: tags
+        run: |
+          TAGS="${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:latest-arm64"
+          if [ -n "${{ inputs.image_version }}" ]; then
+            TAGS="${TAGS},${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:${{ inputs.image_version }}-arm64"
+          fi
+          echo "list=${TAGS}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push image arm64
+        uses: docker/build-push-action@v6
         with:
           platforms: linux/arm64
           context: ${{ github.workspace }}
           file: server-ce/Dockerfile
           build-args: |
+            OVERLEAF_BASE_TAG=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base:latest
             SHARELATEX_BASE_TAG=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex-base
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:latest-arm64
+          tags: ${{ steps.tags.outputs.list }}
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:cache-arm
-          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:cache-arm,mode=max
+          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:cache-arm,mode=min
+
+      - name: Cleanup Docker build cache
+        if: always()
+        run: docker builder prune -af
