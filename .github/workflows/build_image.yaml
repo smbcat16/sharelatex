@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       image_version:
-        description: 'Số phiên bản để gắn tag Docker (ví dụ: 5.5.1)'
+        description: 'Số phiên bản để gắn tag Docker'
         required: true
         type: string
       buildImageAMD64:
