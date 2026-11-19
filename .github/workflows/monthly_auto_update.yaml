@@ -145,6 +145,8 @@ jobs:
     needs: [check-update, build-image]
     runs-on: self-hosted
     steps:
+      - name: Sao lưu dữ liệu Overleaf trước khi cập nhật
+        run: "$HOME/overleaf/backup.sh"
       - name: Pull, cập nhật container overleaf & kiểm tra sức khỏe (có Auto-Rollback)
         run: |
           cd "$HOME/overleaf"
