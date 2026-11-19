@@ -2,12 +2,12 @@ name: Monthly Overleaf Auto-Update
 
 on:
   schedule:
-    # 20:00 UTC ngày 1 = 03:00 sáng ngày 2 giờ Việt Nam (hoặc đổi thành '0 20 1 * *')
+    # 20:00 UTC ngày mùng 1 = 03:00 sáng ngày mùng 2 hằng tháng (giờ Việt Nam)
     - cron: '0 20 1 * *'
   workflow_dispatch:
     inputs:
       force_update:
-        description: 'Ép build và cập nhật lại kể cả khi trùng phiên bản'
+        description: 'Ép build và cập nhật lại kể cả khi trùng phiên bản hoặc nhảy major'
         required: false
         default: false
         type: boolean
@@ -114,7 +114,7 @@ jobs:
           gh issue create \
             --repo "${{ github.repository }}" \
             --title "Cảnh báo: Overleaf có bản nâng cấp lớn ${{ needs.check-update.outputs.latest_version }}" \
-            --body "Phát hiện bản phát hành lớn mới (**${{ needs.check-update.outputs.latest_tag }}**, hiện tại đang chạy **${{ needs.check-update.outputs.current_version }}**). Hệ thống đã tạm dừng tự động cập nhật để tránh lỗi tương thích MongoDB/Redis. Hãy kiểm tra Release Notes của Overleaf, sao lưu dữ liệu rồi chạy tay workflow với tùy chọn \`force_update\` nếu muốn nâng cấp."
+            --body "Phát hiện bản phát hành lớn mới (**${{ needs.check-update.outputs.latest_tag }}**, hiện tại đang chạy **${{ needs.check-update.outputs.current_version }}**). Hệ thống đã tạm dừng tự động cập nhật để tránh lỗi tương thích MongoDB/Redis. Hãy kiểm tra Release Notes của Overleaf rồi chạy tay workflow với tùy chọn force_update nếu muốn nâng cấp."
 
   build-base:
     needs: check-update
@@ -145,28 +145,24 @@ jobs:
     needs: [check-update, build-image]
     runs-on: self-hosted
     steps:
-      - name: Sao lưu dữ liệu Overleaf trước khi cập nhật
+      - name: Sao lưu dữ liệu Overleaf và đẩy Google Drive trước khi cập nhật
         run: "$HOME/overleaf/backup.sh"
-      - name: Pull, cập nhật container overleaf & kiểm tra sức khỏe (có Auto-Rollback)
+
+      - name: Pull, cập nhật container overleaf và kiểm tra sức khỏe (có Auto-Rollback)
         run: |
           cd "$HOME/overleaf"
 
-          # Lưu lại ID và tên tag của image đang chạy ổn định trước khi đụng vào container
           PREV_IMAGE_ID=$(docker inspect --format='{{.Image}}' overleaf 2>/dev/null || echo "")
           IMAGE_REF=$(docker inspect --format='{{.Config.Image}}' overleaf 2>/dev/null || echo "${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:latest-arm64")
 
-          # Tải image mới khi trang web vẫn đang chạy bình thường
           docker compose pull overleaf
-
-          # Chỉ khởi động lại duy nhất container overleaf, không chạm vào mongo/redis
           docker compose up -d --no-deps overleaf
+          docker compose restart cloudflared
 
-          # Kiểm tra phản hồi HTTP nội bộ tối đa 90 giây
           HEALTHY=false
           for i in $(seq 1 18); do
             sleep 5
-            if docker exec overleaf curl -sf http://localhost:80/status >/dev/null 2>&1 || \
-               docker exec overleaf curl -sfI http://localhost:80/login >/dev/null 2>&1; then
+            if docker exec overleaf curl -sfI http://localhost:80/login >/dev/null 2>&1; then
               HEALTHY=true
               break
             fi
@@ -177,10 +173,11 @@ jobs:
             echo "Cập nhật thành công lên ${{ needs.check-update.outputs.latest_version }}!"
             docker image prune -af
           else
-            echo "LỖI: Bản mới không phản hồi sau 90 giây. Tiến hành khôi phục bản cũ..."
+            echo "LỖI: Bản mới không phản hồi sau 90 giây. Đang khôi phục về bản cũ..."
             if [ -n "$PREV_IMAGE_ID" ]; then
               docker tag "$PREV_IMAGE_ID" "$IMAGE_REF"
               docker compose up -d --no-deps overleaf
+              docker compose restart cloudflared
               echo "Đã rollback thành công về image cũ ($PREV_IMAGE_ID)."
             fi
             exit 1
