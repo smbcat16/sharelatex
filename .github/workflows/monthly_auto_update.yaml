@@ -45,33 +45,46 @@ jobs:
           CURRENT_VERSION=$(jq -r '.current_version // empty' sharelatex.json)
           CURRENT_SHA=$(jq -r '.current_sha // empty' sharelatex.json)
 
-          # Lấy toàn bộ Git Tags ổn định của Overleaf CE (bỏ qua prerelease/rc và không phụ thuộc mục Releases)
-          ALL_TAGS=$(git ls-remote --tags --refs https://github.com/overleaf/overleaf.git \
-            | awk '{print $2}' | sed 's|^refs/tags/||')
+          # Lấy số phiên bản Overleaf CE ổn định mới nhất trực tiếp từ Docker Hub chính thức
+          DOCKER_TAGS=$(curl -sfL \
+            "https://hub.docker.com/v2/repositories/sharelatex/sharelatex/tags?page_size=100&ordering=last_updated" \
+            | jq -r '.results[]?.name // empty' \
+            | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' || true)
 
-          CE_TAGS=$(echo "$ALL_TAGS" | grep -E '^(server-ce[-/]|v)?[0-9]+\.[0-9]+\.[0-9]+$' || true)
-          if [ -z "$CE_TAGS" ]; then
-            echo "Không tìm thấy tag phát hành hợp lệ nào từ overleaf/overleaf."
+          if [ -z "$DOCKER_TAGS" ]; then
+            echo "Không lấy được danh sách phiên bản từ Docker Hub (sharelatex/sharelatex)."
             exit 1
           fi
 
-          # Sắp xếp chuẩn theo số phiên bản (SemVer) và lấy bản cao nhất
-          LATEST_LINE=$(echo "$CE_TAGS" | while read -r tag; do
-            ver=$(echo "$tag" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
-            echo "$ver $tag"
-          done | sort -k1,1V | tail -n1)
+          LATEST_VERSION=$(echo "$DOCKER_TAGS" | sort -V | tail -n1)
 
-          LATEST_VERSION=$(echo "$LATEST_LINE" | awk '{print $1}')
-          LATEST_TAG=$(echo "$LATEST_LINE" | awk '{print $2}')
+          # Tìm Git Tag tương ứng trên overleaf/overleaf; nếu không có tag Git thì khóa theo commit SHA mới nhất của nhánh main
+          ESCAPED_VER=$(echo "$LATEST_VERSION" | sed 's/\./\\./g')
+          ALL_TAGS=$(git ls-remote --tags --refs https://github.com/overleaf/overleaf.git \
+            | awk '{print $2}' | sed 's|^refs/tags/||' || true)
+          MATCHED_TAG=$(echo "$ALL_TAGS" \
+            | grep -E "(^|[-/_v])${ESCAPED_VER}$" \
+            | grep -viE '(rc|alpha|beta|test)' \
+            | head -n1 || true)
 
-          # Lấy chính xác commit SHA của tag (xử lý cả lightweight tag lẫn annotated tag)
-          LATEST_SHA=$(git ls-remote --tags https://github.com/overleaf/overleaf.git \
-            "refs/tags/${LATEST_TAG}" "refs/tags/${LATEST_TAG}^{}" | tail -n1 | awk '{print $1}')
+          if [ -n "$MATCHED_TAG" ]; then
+            LATEST_TAG="$MATCHED_TAG"
+            LATEST_SHA=$(git ls-remote --tags https://github.com/overleaf/overleaf.git \
+              "refs/tags/${MATCHED_TAG}" "refs/tags/${MATCHED_TAG}^{}" | tail -n1 | awk '{print $1}')
+          else
+            LATEST_SHA=$(git ls-remote https://github.com/overleaf/overleaf.git refs/heads/main | awk '{print $1}')
+            LATEST_TAG="$LATEST_SHA"
+          fi
+
+          if [ -z "$LATEST_SHA" ]; then
+            echo "Không lấy được commit SHA từ overleaf/overleaf."
+            exit 1
+          fi
 
           echo "Hiện tại: ${CURRENT_VERSION} (${CURRENT_TAG})"
-          echo "Mới nhất: ${LATEST_VERSION} (${LATEST_TAG} - ${LATEST_SHA})"
+          echo "Mới nhất (Docker Hub): ${LATEST_VERSION} (ref: ${LATEST_TAG} - sha: ${LATEST_SHA})"
 
-          # Chỉ cập nhật khi phiên bản mới thực sự CAO HƠN phiên bản hiện tại (chống hạ cấp nhầm)
+          # Chỉ cập nhật khi phiên bản mới thực sự cao hơn phiên bản hiện tại
           HIGHER_VER=$(printf '%s\n%s\n' "$CURRENT_VERSION" "$LATEST_VERSION" | sort -V | tail -n1)
           HAS_UPDATE="false"
           if [ "$LATEST_VERSION" != "$CURRENT_VERSION" ] && [ "$HIGHER_VER" = "$LATEST_VERSION" ]; then
@@ -87,7 +100,7 @@ jobs:
             IS_MAJOR="true"
           fi
 
-          # So sánh trực tiếp mã băm của Dockerfile-base giữa 2 phiên bản
+          # So sánh trực tiếp mã băm của Dockerfile-base giữa 2 commit để chỉ build lại TeX Live khi cần
           NEED_BASE="false"
           if [ "${{ inputs.force_rebuild_base }}" = "true" ]; then
             NEED_BASE="true"
@@ -123,7 +136,7 @@ jobs:
           gh issue create \
             --repo "${{ github.repository }}" \
             --title "Cảnh báo: Overleaf có bản nâng cấp lớn ${{ needs.check-update.outputs.latest_version }}" \
-            --body "Phát hiện bản phát hành lớn mới (**${{ needs.check-update.outputs.latest_tag }}**, hiện tại đang chạy **${{ needs.check-update.outputs.current_version }}**). Hệ thống đã tạm dừng tự động cập nhật để tránh lỗi tương thích MongoDB/Redis. Hãy kiểm tra Release Notes của Overleaf rồi chạy tay workflow với tùy chọn force_update nếu muốn nâng cấp."
+            --body "Phát hiện bản phát hành lớn mới (**${{ needs.check-update.outputs.latest_version }}**, ref: \`${{ needs.check-update.outputs.latest_tag }}\`, hiện tại đang chạy **${{ needs.check-update.outputs.current_version }}**). Hệ thống đã tạm dừng tự động cập nhật để tránh lỗi tương thích MongoDB/Redis. Hãy kiểm tra Release Notes của Overleaf rồi chạy tay workflow với tùy chọn force_update nếu muốn nâng cấp."
 
   build-base:
     needs: check-update
