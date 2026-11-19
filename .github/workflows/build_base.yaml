@@ -26,7 +26,7 @@ on:
         default: true
         type: boolean
       also_build_amd64:
-        description: 'Build thêm kiến trúc AMD64 (tốn thời gian & ổ đĩa)'
+        description: 'Build thêm kiến trúc AMD64 (tốn thời gian và ổ đĩa)'
         required: false
         default: false
         type: boolean
@@ -36,8 +36,7 @@ jobs:
     runs-on: self-hosted
     steps:
       - name: Cleanup build folder
-        run: |
-          rm -rf ./* ./.??* || true
+        run: rm -rf ./* ./.??* || true
 
       - name: Checkout Overleaf
         uses: actions/checkout@v4
