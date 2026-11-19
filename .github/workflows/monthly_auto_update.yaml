@@ -38,38 +38,43 @@ jobs:
 
       - name: Check latest Overleaf CE release
         id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           CURRENT_TAG=$(jq -r '.current_tag // empty' sharelatex.json)
           CURRENT_VERSION=$(jq -r '.current_version // empty' sharelatex.json)
           CURRENT_SHA=$(jq -r '.current_sha // empty' sharelatex.json)
 
-          RELEASE_JSON=$(curl -sfL -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/overleaf/overleaf/releases?per_page=30")
+          # Lấy toàn bộ Git Tags ổn định của Overleaf CE (bỏ qua prerelease/rc và không phụ thuộc mục Releases)
+          ALL_TAGS=$(git ls-remote --tags --refs https://github.com/overleaf/overleaf.git \
+            | awk '{print $2}' | sed 's|^refs/tags/||')
 
-          LATEST_TAG=$(echo "$RELEASE_JSON" | jq -r '
-            ([.[] | select(.draft == false and .prerelease == false and (.tag_name | test("server-ce"; "i")))][0].tag_name)
-            // ([.[] | select(.draft == false and .prerelease == false)][0].tag_name)
-            // empty
-          ')
-
-          if [ -z "$LATEST_TAG" ]; then
-            echo "Không lấy được release mới nhất từ overleaf/overleaf."
+          CE_TAGS=$(echo "$ALL_TAGS" | grep -E '^(server-ce[-/]|v)?[0-9]+\.[0-9]+\.[0-9]+$' || true)
+          if [ -z "$CE_TAGS" ]; then
+            echo "Không tìm thấy tag phát hành hợp lệ nào từ overleaf/overleaf."
             exit 1
           fi
 
-          LATEST_SHA=$(curl -sfL -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/overleaf/overleaf/commits/${LATEST_TAG}" | jq -r '.sha // empty')
+          # Sắp xếp chuẩn theo số phiên bản (SemVer) và lấy bản cao nhất
+          LATEST_LINE=$(echo "$CE_TAGS" | while read -r tag; do
+            ver=$(echo "$tag" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+            echo "$ver $tag"
+          done | sort -k1,1V | tail -n1)
 
-          LATEST_VERSION=$(echo "$LATEST_TAG" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
-          if [ -z "$LATEST_VERSION" ]; then
-            LATEST_VERSION=$(echo "$LATEST_TAG" | tr '/' '-')
-          fi
+          LATEST_VERSION=$(echo "$LATEST_LINE" | awk '{print $1}')
+          LATEST_TAG=$(echo "$LATEST_LINE" | awk '{print $2}')
+
+          # Lấy chính xác commit SHA của tag (xử lý cả lightweight tag lẫn annotated tag)
+          LATEST_SHA=$(git ls-remote --tags https://github.com/overleaf/overleaf.git \
+            "refs/tags/${LATEST_TAG}" "refs/tags/${LATEST_TAG}^{}" | tail -n1 | awk '{print $1}')
 
           echo "Hiện tại: ${CURRENT_VERSION} (${CURRENT_TAG})"
           echo "Mới nhất: ${LATEST_VERSION} (${LATEST_TAG} - ${LATEST_SHA})"
 
+          # Chỉ cập nhật khi phiên bản mới thực sự CAO HƠN phiên bản hiện tại (chống hạ cấp nhầm)
+          HIGHER_VER=$(printf '%s\n%s\n' "$CURRENT_VERSION" "$LATEST_VERSION" | sort -V | tail -n1)
           HAS_UPDATE="false"
-          if [ "$LATEST_TAG" != "$CURRENT_TAG" ] && [ "$LATEST_VERSION" != "$CURRENT_VERSION" ]; then
+          if [ "$LATEST_VERSION" != "$CURRENT_VERSION" ] && [ "$HIGHER_VER" = "$LATEST_VERSION" ]; then
             HAS_UPDATE="true"
           elif [ "${{ inputs.force_update }}" = "true" ]; then
             HAS_UPDATE="true"
@@ -82,14 +87,18 @@ jobs:
             IS_MAJOR="true"
           fi
 
+          # So sánh trực tiếp mã băm của Dockerfile-base giữa 2 phiên bản
           NEED_BASE="false"
           if [ "${{ inputs.force_rebuild_base }}" = "true" ]; then
             NEED_BASE="true"
           elif [ "$HAS_UPDATE" = "true" ] && [ -n "$CURRENT_SHA" ] && [ "$CURRENT_SHA" != "main" ]; then
-            CHANGED_FILES=$(curl -sfL -H "Accept: application/vnd.github+json" \
-              "https://api.github.com/repos/overleaf/overleaf/compare/${CURRENT_SHA}...${LATEST_SHA}" \
-              | jq -r '.files[]?.filename' 2>/dev/null || true)
-            if echo "$CHANGED_FILES" | grep -q "server-ce/Dockerfile-base"; then
+            OLD_BASE_BLOB=$(curl -sfL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GH_TOKEN}" \
+              "https://api.github.com/repos/overleaf/overleaf/contents/server-ce/Dockerfile-base?ref=${CURRENT_SHA}" \
+              | jq -r '.sha // empty' 2>/dev/null || true)
+            NEW_BASE_BLOB=$(curl -sfL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GH_TOKEN}" \
+              "https://api.github.com/repos/overleaf/overleaf/contents/server-ce/Dockerfile-base?ref=${LATEST_SHA}" \
+              | jq -r '.sha // empty' 2>/dev/null || true)
+            if [ -n "$OLD_BASE_BLOB" ] && [ -n "$NEW_BASE_BLOB" ] && [ "$OLD_BASE_BLOB" != "$NEW_BASE_BLOB" ]; then
               NEED_BASE="true"
             fi
           fi
