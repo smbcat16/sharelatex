@@ -1,0 +1,209 @@
+name: Monthly Overleaf Auto-Update
+
+on:
+  schedule:
+    # 20:00 UTC ngày 1 = 03:00 sáng ngày 2 giờ Việt Nam (hoặc đổi thành '0 20 1 * *')
+    - cron: '0 20 1 * *'
+  workflow_dispatch:
+    inputs:
+      force_update:
+        description: 'Ép build và cập nhật lại kể cả khi trùng phiên bản'
+        required: false
+        default: false
+        type: boolean
+      force_rebuild_base:
+        description: 'Ép build lại cả sharelatex-base (TeX Live)'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  check-update:
+    runs-on: ubuntu-latest
+    outputs:
+      has_update: ${{ steps.check.outputs.has_update }}
+      is_major: ${{ steps.check.outputs.is_major }}
+      need_base: ${{ steps.check.outputs.need_base }}
+      latest_tag: ${{ steps.check.outputs.latest_tag }}
+      latest_version: ${{ steps.check.outputs.latest_version }}
+      latest_sha: ${{ steps.check.outputs.latest_sha }}
+      current_version: ${{ steps.check.outputs.current_version }}
+    steps:
+      - name: Checkout current repo
+        uses: actions/checkout@v4
+
+      - name: Check latest Overleaf CE release
+        id: check
+        run: |
+          CURRENT_TAG=$(jq -r '.current_tag // empty' sharelatex.json)
+          CURRENT_VERSION=$(jq -r '.current_version // empty' sharelatex.json)
+          CURRENT_SHA=$(jq -r '.current_sha // empty' sharelatex.json)
+
+          RELEASE_JSON=$(curl -sfL -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/overleaf/overleaf/releases?per_page=30")
+
+          LATEST_TAG=$(echo "$RELEASE_JSON" | jq -r '
+            ([.[] | select(.draft == false and .prerelease == false and (.tag_name | test("server-ce"; "i")))][0].tag_name)
+            // ([.[] | select(.draft == false and .prerelease == false)][0].tag_name)
+            // empty
+          ')
+
+          if [ -z "$LATEST_TAG" ]; then
+            echo "Không lấy được release mới nhất từ overleaf/overleaf."
+            exit 1
+          fi
+
+          LATEST_SHA=$(curl -sfL -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/overleaf/overleaf/commits/${LATEST_TAG}" | jq -r '.sha // empty')
+
+          LATEST_VERSION=$(echo "$LATEST_TAG" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
+          if [ -z "$LATEST_VERSION" ]; then
+            LATEST_VERSION=$(echo "$LATEST_TAG" | tr '/' '-')
+          fi
+
+          echo "Hiện tại: ${CURRENT_VERSION} (${CURRENT_TAG})"
+          echo "Mới nhất: ${LATEST_VERSION} (${LATEST_TAG} - ${LATEST_SHA})"
+
+          HAS_UPDATE="false"
+          if [ "$LATEST_TAG" != "$CURRENT_TAG" ] && [ "$LATEST_VERSION" != "$CURRENT_VERSION" ]; then
+            HAS_UPDATE="true"
+          elif [ "${{ inputs.force_update }}" = "true" ]; then
+            HAS_UPDATE="true"
+          fi
+
+          CURRENT_MAJOR=$(echo "$CURRENT_VERSION" | cut -d'.' -f1)
+          LATEST_MAJOR=$(echo "$LATEST_VERSION" | cut -d'.' -f1)
+          IS_MAJOR="false"
+          if [ -n "$CURRENT_MAJOR" ] && [ -n "$LATEST_MAJOR" ] && [ "$CURRENT_MAJOR" != "$LATEST_MAJOR" ] && [ "${{ inputs.force_update }}" != "true" ]; then
+            IS_MAJOR="true"
+          fi
+
+          NEED_BASE="false"
+          if [ "${{ inputs.force_rebuild_base }}" = "true" ]; then
+            NEED_BASE="true"
+          elif [ "$HAS_UPDATE" = "true" ] && [ -n "$CURRENT_SHA" ] && [ "$CURRENT_SHA" != "main" ]; then
+            CHANGED_FILES=$(curl -sfL -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/overleaf/overleaf/compare/${CURRENT_SHA}...${LATEST_SHA}" \
+              | jq -r '.files[]?.filename' 2>/dev/null || true)
+            if echo "$CHANGED_FILES" | grep -q "server-ce/Dockerfile-base"; then
+              NEED_BASE="true"
+            fi
+          fi
+
+          echo "has_update=${HAS_UPDATE}" >> "$GITHUB_OUTPUT"
+          echo "is_major=${IS_MAJOR}" >> "$GITHUB_OUTPUT"
+          echo "need_base=${NEED_BASE}" >> "$GITHUB_OUTPUT"
+          echo "latest_tag=${LATEST_TAG}" >> "$GITHUB_OUTPUT"
+          echo "latest_version=${LATEST_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "latest_sha=${LATEST_SHA}" >> "$GITHUB_OUTPUT"
+          echo "current_version=${CURRENT_VERSION}" >> "$GITHUB_OUTPUT"
+
+  notify-major-upgrade:
+    needs: check-update
+    if: ${{ needs.check-update.outputs.has_update == 'true' && needs.check-update.outputs.is_major == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tạo Issue cảnh báo bản nâng cấp lớn (Major)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "Cảnh báo: Overleaf có bản nâng cấp lớn ${{ needs.check-update.outputs.latest_version }}" \
+            --body "Phát hiện bản phát hành lớn mới (**${{ needs.check-update.outputs.latest_tag }}**, hiện tại đang chạy **${{ needs.check-update.outputs.current_version }}**). Hệ thống đã tạm dừng tự động cập nhật để tránh lỗi tương thích MongoDB/Redis. Hãy kiểm tra Release Notes của Overleaf, sao lưu dữ liệu rồi chạy tay workflow với tùy chọn \`force_update\` nếu muốn nâng cấp."
+
+  build-base:
+    needs: check-update
+    if: ${{ needs.check-update.outputs.has_update == 'true' && needs.check-update.outputs.is_major == 'false' && needs.check-update.outputs.need_base == 'true' }}
+    uses: ./.github/workflows/build_base.yaml
+    with:
+      overleaf_ref: ${{ needs.check-update.outputs.latest_tag }}
+      scheme_full: true
+    secrets: inherit
+
+  build-image:
+    needs: [check-update, build-base]
+    if: |
+      always() &&
+      needs.check-update.result == 'success' &&
+      needs.check-update.outputs.has_update == 'true' &&
+      needs.check-update.outputs.is_major == 'false' &&
+      (needs.build-base.result == 'success' || needs.build-base.result == 'skipped')
+    uses: ./.github/workflows/build_image.yaml
+    with:
+      overleaf_ref: ${{ needs.check-update.outputs.latest_tag }}
+      image_version: ${{ needs.check-update.outputs.latest_version }}
+      buildImageAMD64: false
+      buildImageARM64: true
+    secrets: inherit
+
+  deploy-safely:
+    needs: [check-update, build-image]
+    runs-on: self-hosted
+    steps:
+      - name: Pull, cập nhật container overleaf & kiểm tra sức khỏe (có Auto-Rollback)
+        run: |
+          cd "$HOME/overleaf"
+
+          # Lưu lại ID và tên tag của image đang chạy ổn định trước khi đụng vào container
+          PREV_IMAGE_ID=$(docker inspect --format='{{.Image}}' overleaf 2>/dev/null || echo "")
+          IMAGE_REF=$(docker inspect --format='{{.Config.Image}}' overleaf 2>/dev/null || echo "${{ secrets.DOCKERHUB_USERNAME }}/sharelatex:latest-arm64")
+
+          # Tải image mới khi trang web vẫn đang chạy bình thường
+          docker compose pull overleaf
+
+          # Chỉ khởi động lại duy nhất container overleaf, không chạm vào mongo/redis
+          docker compose up -d --no-deps overleaf
+
+          # Kiểm tra phản hồi HTTP nội bộ tối đa 90 giây
+          HEALTHY=false
+          for i in $(seq 1 18); do
+            sleep 5
+            if docker exec overleaf curl -sf http://localhost:80/status >/dev/null 2>&1 || \
+               docker exec overleaf curl -sfI http://localhost:80/login >/dev/null 2>&1; then
+              HEALTHY=true
+              break
+            fi
+            echo "Đang chờ Overleaf khởi động ($((i*5))s)..."
+          done
+
+          if [ "$HEALTHY" = "true" ]; then
+            echo "Cập nhật thành công lên ${{ needs.check-update.outputs.latest_version }}!"
+            docker image prune -af
+          else
+            echo "LỖI: Bản mới không phản hồi sau 90 giây. Tiến hành khôi phục bản cũ..."
+            if [ -n "$PREV_IMAGE_ID" ]; then
+              docker tag "$PREV_IMAGE_ID" "$IMAGE_REF"
+              docker compose up -d --no-deps overleaf
+              echo "Đã rollback thành công về image cũ ($PREV_IMAGE_ID)."
+            fi
+            exit 1
+          fi
+
+  update-version-record:
+    needs: [check-update, deploy-safely]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout current repo
+        uses: actions/checkout@v4
+
+      - name: Lưu phiên bản mới vào sharelatex.json
+        run: |
+          jq --arg tag "${{ needs.check-update.outputs.latest_tag }}" \
+             --arg ver "${{ needs.check-update.outputs.latest_version }}" \
+             --arg sha "${{ needs.check-update.outputs.latest_sha }}" \
+             '.current_tag = $tag | .current_version = $ver | .current_sha = $sha' \
+             sharelatex.json > sharelatex.tmp.json
+          mv sharelatex.tmp.json sharelatex.json
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet sharelatex.json; then
+            git add sharelatex.json
+            git commit -m "chore: update Overleaf to ${{ needs.check-update.outputs.latest_version }} [skip ci]"
+            git push
+          fi
